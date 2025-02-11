@@ -1,5 +1,5 @@
-const staticCacheName = 'site-static-v2';
-const dynamicCacheName = 'site-dynamic-v1';
+const staticCacheName = 'site-static-v3';
+const dynamicCacheName = 'site-dynamic-v2';
 const assets = [
   '/',
   '/index.html',
@@ -34,6 +34,12 @@ self.addEventListener('install', evt => {
       cache.addAll(assets);
     })
   );
+});
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  if (event.action === 'install') {
+      clients.openWindow('/pages/install.html');
+  }
 });
 
 // activate event
