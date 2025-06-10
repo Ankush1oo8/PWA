@@ -8,6 +8,7 @@ const assets = [
   '/js/ui.js',
   '/js/materialize.min.js',
   '/css/styles.css',
+  '/js/notifications.js',
   '/css/materialize.min.css',
   '/img/dish.png',
   'https://fonts.googleapis.com/icon?family=Material+Icons',
