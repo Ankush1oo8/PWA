@@ -26,29 +26,69 @@ const limitCacheSize = (name, size) => {
   });
 };
 
+// Function to request notification permission
+const requestNotificationPermission = async () => {
+  if ('Notification' in self) {
+    try {
+      const permission = await Notification.requestPermission();
+      return permission;
+    } catch (error) {
+      console.error('Error requesting notification permission:', error);
+    }
+  }
+};
+
+// Function to show notification
+const showNotification = (title, options) => {
+  if ('Notification' in self && Notification.permission === 'granted') {
+    self.registration.showNotification(title, options);
+  }
+};
+
 // install event
 self.addEventListener('install', evt => {
-  //console.log('service worker installed');
   evt.waitUntil(
-    caches.open(staticCacheName).then((cache) => {
-      console.log('caching shell assets');
-      cache.addAll(assets);
-    })
+    Promise.all([
+      caches.open(staticCacheName).then((cache) => {
+        console.log('caching shell assets');
+        return cache.addAll(assets);
+      }),
+      requestNotificationPermission()
+    ])
   );
 });
+
+// notification click event
 self.addEventListener('notificationclick', event => {
   event.notification.close();
   if (event.action === 'install') {
-      clients.openWindow('/pages/install.html');
+    event.waitUntil(
+      clients.openWindow('/pages/install.html')
+    );
+  } else {
+    // Handle default click (focus or open main page)
+    event.waitUntil(
+      clients.matchAll({
+        type: 'window',
+        includeUncontrolled: true
+      }).then(clientList => {
+        for (const client of clientList) {
+          if (client.url === '/' && 'focus' in client) {
+            return client.focus();
+          }
+        }
+        if (clients.openWindow) {
+          return clients.openWindow('/');
+        }
+      })
+    );
   }
 });
 
 // activate event
 self.addEventListener('activate', evt => {
-  //console.log('service worker activated');
   evt.waitUntil(
     caches.keys().then(keys => {
-      //console.log(keys);
       return Promise.all(keys
         .filter(key => key !== staticCacheName && key !== dynamicCacheName)
         .map(key => caches.delete(key))
@@ -59,21 +99,37 @@ self.addEventListener('activate', evt => {
 
 // fetch event
 self.addEventListener('fetch', evt => {
-  //console.log('fetch event', evt);
   evt.respondWith(
     caches.match(evt.request).then(cacheRes => {
       return cacheRes || fetch(evt.request).then(fetchRes => {
         return caches.open(dynamicCacheName).then(cache => {
           cache.put(evt.request.url, fetchRes.clone());
-          // check cached items size
           limitCacheSize(dynamicCacheName, 15);
           return fetchRes;
-        })
+        });
+      }).catch(() => {
+        if(evt.request.url.indexOf('.html') > -1){
+          return caches.match('/pages/fallback.html');
+        }
       });
-    }).catch(() => {
-      if(evt.request.url.indexOf('.html') > -1){
-        return caches.match('/pages/fallback.html');
-      } 
     })
+  );
+});
+
+// Example push event handler
+self.addEventListener('push', event => {
+  const title = 'New Update Available';
+  const options = {
+    body: 'There is new content available on the site!',
+    icon: '/img/dish.png',
+    badge: '/img/dish.png',
+    vibrate: [200, 100, 200],
+    data: {
+      url: '/'
+    }
+  };
+  
+  event.waitUntil(
+    showNotification(title, options)
   );
 });
